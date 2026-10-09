@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#194167">
+<meta name="description" content="Asistente pedagógico con IA para planificar sesiones de aprendizaje de educación primaria en Perú.">
+<title>Asistente Pedagógico · Perú V2.0</title>
+<link rel="stylesheet" href="/static/estilos.css?v=2.0.0">
+<link rel="preconnect" href="https://unpkg.com" crossorigin>
+<link rel="preconnect" href="https://api.groq.com" crossorigin>
+</head>
+<body>
+
+<!-- ======================== HEADER ======================== -->
+<header role="banner">
+  <div class="marca">
+    <span class="logo" aria-hidden="true">✦</span>
+    <div>
+      <strong>AULA IA <small>PERÚ</small></strong>
+      <p>Asistente de planificación de primaria · V2.0 · Clase guiada</p>
+    </div>
+  </div>
+
+  <div class="header-actions">
+    <button type="button" id="btnAyuda" class="ghost" title="Atajos y ayuda (?)">? Ayuda</button>
+    <div class="chip" id="estadoIA" role="status" aria-live="polite">Comprobando servicio…</div>
+  </div>
+</header>
+
+<!-- ======================== AVISO GLOBAL ======================== -->
+<div id="toastHost" class="toast-host" aria-live="polite" aria-atomic="true"></div>
+
+<!-- ======================== MAIN ======================== -->
+<main role="main">
+
+  <!-- ============ ASIDE (FORMULARIO) ============ -->
+  <aside class="lateral" aria-label="Datos de la sesión">
+
+    <div class="panel-intro">
+      <span>PLANIFICACIÓN DOCENTE</span>
+      <h1>Crea tu próxima sesión de aprendizaje.</h1>
+      <p>Planificación para 1.° a 6.° de primaria con propósito, criterios, evidencias y evaluación formativa alineada al CNEB.</p>
+    </div>
+
+    <form id="form" novalidate autocomplete="off">
+      <h2>Datos de la sesión</h2>
+
+      <div class="cols">
+        <label>Grado
+          <select name="grado" required>
+            <option value="">Seleccionar</option>
+            <option value="1">1.°</option>
+            <option value="2">2.°</option>
+            <option value="3">3.°</option>
+            <option value="4">4.°</option>
+            <option value="5">5.°</option>
+            <option value="6">6.°</option>
+          </select>
+        </label>
+
+        <label>Duración
+          <select name="duracion">
+            <option value="30">30 min</option>
+            <option value="45">45 min</option>
+            <option value="60">60 min</option>
+            <option value="90" selected>90 min</option>
+            <option value="120">120 min</option>
+            <option value="135">135 min</option>
+            <option value="180">180 min</option>
+            <option value="240">240 min</option>
+          </select>
+        </label>
+      </div>
+
+      <label>Área curricular
+        <select name="area" id="area" required>
+          <option value="">Seleccionar área</option>
+        </select>
+      </label>
+
+      <label>Competencia
+        <select name="competencia" id="competencia" disabled>
+          <option value="">Seleccione primero el área</option>
+        </select>
+      </label>
+
+      <label>Tema / título de trabajo <span class="required" aria-hidden="true">*</span>
+        <input name="tema" placeholder="Ej.: Resolvemos problemas de suma en el mercado"
+               required maxlength="250" aria-required="true">
+      </label>
+
+      <label>Enfoque transversal
+        <select name="enfoque" id="enfoque">
+          <option value="">Seleccionar enfoque</option>
+        </select>
+      </label>
+
+      <details>
+        <summary>Personalización pedagógica</summary>
+
+        <label>Contexto o situación significativa
+          <textarea name="contexto" rows="2" maxlength="500"
+            placeholder="Ej.: feria de productos de Huánuco, contexto rural o urbano…"></textarea>
+        </label>
+
+        <label>Necesidades y apoyos de aprendizaje
+          <textarea name="necesidades" rows="2" maxlength="500"
+            placeholder="Sin nombres ni datos personales de estudiantes"></textarea>
+        </label>
+
+        <label>Indicaciones específicas
+          <textarea name="indicaciones" rows="2" maxlength="500"
+            placeholder="Dinámicas, recursos disponibles, actividad de cierre…"></textarea>
+        </label>
+      </details>
+
+      <details>
+        <summary>Datos institucionales (opcional)</summary>
+
+        <label>Docente
+          <input name="docente" maxlength="120" placeholder="Nombre del docente">
+        </label>
+
+        <label>Institución educativa
+          <input name="institucion" maxlength="120" placeholder="Nombre de la I. E.">
+        </label>
+      </details>
+
+      <div class="form-actions">
+        <button type="submit" class="primary" id="generar">
+          <span class="spinner" hidden aria-hidden="true"></span>
+          <span class="label">✦ Generar sesión de aprendizaje</span>
+        </button>
+        <button type="button" id="btnLimpiar" class="ghost" title="Vaciar el formulario">Limpiar</button>
+      </div>
+
+      <div class="aviso" role="note">
+        La propuesta es editable. Debes verificar los desempeños y capacidades con el Programa Curricular del MINEDU.
+      </div>
+    </form>
+  </aside>
+
+  <!-- ============ SECCIÓN PRINCIPAL ============ -->
+  <section class="principal" aria-label="Área de trabajo">
+
+    <div class="toolbar">
+      <div>
+        <span class="eyebrow">ÁREA DE TRABAJO</span>
+        <h2>Sesión de aprendizaje</h2>
+      </div>
+      <div class="actions">
+        <button type="button" id="voice" title="Dictar el tema por micrófono (V)">🎙 Dictar tema</button>
+        <button type="button" id="speak" title="Leer el resumen (L)">🔊 Escuchar</button>
+      </div>
+    </div>
+
+    <!-- ====== AVATAR 3D ====== -->
+    <section class="avatar-panel" aria-label="Asistente virtual tridimensional">
+      <div class="avatar-heading">
+        <div>
+          <span class="eyebrow">ASISTENTE VIRTUAL 3D</span>
+          <h3>Tu asistente pedagógico</h3>
+          <p>Dicta el tema y el avatar escuchará. Cuando responda, moverá la boca y realizará gestos.</p>
+        </div>
+        <span id="avatarEstado" class="avatar-pill" role="status" aria-live="polite">Cargando avatar…</span>
+      </div>
+
+      <div id="avatarEscena" class="avatar-escena" role="img" aria-label="Escena 3D del asistente">
+        <div id="avatarFallback" class="avatar-fallback" hidden>
+          Avatar 3D no disponible. Puedes seguir usando el asistente sin él.
+        </div>
+        <div id="avatarDiagnostico" class="avatar-diagnostico" aria-live="polite"></div>
+      </div>
+
+      <div class="avatar-controls">
+        <button id="avatarSaludar" type="button">▶ Presentarse</button>
+        <button id="avatarSilencio" type="button">■ Detener voz</button>
+        <span id="avatarTranscripcion" aria-live="polite">Puedes activar «Dictar tema».</span>
+      </div>
+    </section>
+
+    <!-- ====== CLASE GUIADA ====== -->
+    <section id="clasePanel" class="clase-panel" hidden aria-label="Clase guiada por el asistente">
+      <div class="clase-title">
+        <div>
+          <span class="eyebrow">MODO ENSEÑANZA</span>
+          <h3>El avatar dicta tu sesión de aprendizaje</h3>
+          <p>La clase se presenta por etapas. Pulsa «Continuar» después de realizar cada actividad con los estudiantes.</p>
+        </div>
+        <span id="claseEtapa" class="clase-badge" role="status" aria-live="polite">Preparado</span>
+      </div>
+
+      <div class="clase-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="claseProgressWrap">
+        <div id="claseProgressBar"></div>
+      </div>
+
+      <div class="clase-text" id="claseTexto" aria-live="polite">Genera una sesión y selecciona «Iniciar clase».</div>
+
+      <div class="clase-note" id="versionFrontend">Cargando frontend V2.0…</div>
+      <div id="claseEstado" class="clase-note">El docente controla el avance y los tiempos de las actividades.</div>
+
+      <div class="clase-actions">
+        <button type="button" id="claseIniciar" class="primary">▶ Iniciar clase</button>
+        <button type="button" id="claseContinuar" disabled>→ Continuar</button>
+        <button type="button" id="claseRepetir" disabled>↻ Repetir</button>
+        <button type="button" id="claseDetener" disabled>■ Finalizar clase</button>
+      </div>
+    </section>
+
+    <!-- ====== EMPTY STATE ====== -->
+    <div class="empty" id="empty">
+      <div class="orb" aria-hidden="true">✦</div>
+      <h3>Tu sesión comienza aquí</h3>
+      <p>Completa el grado, el área y el tema. El asistente construirá un borrador editable que podrás revisar y exportar a Word.</p>
+      <div class="steps">
+        <span>01 · Datos</span>
+        <span>02 · Generar</span>
+        <span>03 · Revisar y exportar</span>
+      </div>
+    </div>
+
+    <!-- ====== RESULTADOS ====== -->
+    <div id="results" hidden>
+      <div class="status" id="msg" role="status" aria-live="polite"></div>
+
+      <div class="result-toolbar">
+        <span>✎ Puedes editar cualquier campo</span>
+        <div>
+          <button id="imprimir" type="button" title="Imprimir o guardar como PDF (P)">Imprimir / PDF</button>
+          <button id="json" type="button" title="Descargar JSON">Guardar JSON</button>
+          <button id="word" type="button" class="primary small" title="Descargar Word">↓ Exportar Word</button>
+        </div>
+      </div>
+
+      <div class="paper">
+        <div class="doc-top">
+          <span>EDUCACIÓN PRIMARIA · PERÚ</span>
+          <span>Documento editable</span>
+        </div>
+        <h1 contenteditable="true" data-key="titulo" spellcheck="false"></h1>
+        <div class="meta" id="metadata"></div>
+        <div id="editor"></div>
+        <div class="doc-foot">
+          Borrador de apoyo docente. Validar la alineación curricular antes de su uso.
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      Referencias curriculares:
+      <a href="https://www.gob.pe/institucion/minedu/informes-publicaciones/6790803-programa-curricular-de-educacion-primaria" target="_blank" rel="noopener">Programa Curricular de Primaria</a>
+      ·
+      <a href="https://minedu.gob.pe/curriculo/recursos.php" target="_blank" rel="noopener">Recursos MINEDU</a>
+    </footer>
+  </section>
+</main>
+
+<!-- ======================== MODAL DE AYUDA ======================== -->
+<div id="modalAyuda" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="ayudaTitulo">
+  <div class="modal-box">
+    <header>
+      <h3 id="ayudaTitulo">Ayuda y atajos</h3>
+      <button type="button" id="cerrarAyuda" aria-label="Cerrar">✕</button>
+    </header>
+    <div class="modal-body">
+      <p><strong>Atajos de teclado</strong></p>
+      <ul>
+        <li><kbd>G</kbd> — Enfocar tema</li>
+        <li><kbd>V</kbd> — Dictar tema por voz</li>
+        <li><kbd>L</kbd> — Leer el resumen en voz alta</li>
+        <li><kbd>P</kbd> — Imprimir / guardar PDF</li>
+        <li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> — Generar sesión</li>
+        <li><kbd>Esc</kbd> — Cerrar este diálogo</li>
+      </ul>
+      <p><strong>Flujo recomendado</strong></p>
+      <ol>
+        <li>Elige grado, área y tema.</li>
+        <li>Pulsa <em>Generar sesión de aprendizaje</em>.</li>
+        <li>Revisa y edita los campos directamente en el papel.</li>
+        <li>Exporta a Word o guárdalo como JSON.</li>
+      </ol>
+      <p class="muted">Los resultados son orientativos. Verifica desempeños y capacidades con las fuentes oficiales.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== IMPORTMAP ======================== -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<!-- ======================== BOOTSTRAP GLOBAL ======================== -->
+<script>
+/* ============================================================
+   Bootstrap mínimo, independiente de app.js / avatar3d.js.
+   - Captura errores tempranos y los muestra.
+   - Expone utilidades compartidas en window.
+   - Sondea /api/salud para actualizar el chip superior.
+   ============================================================ */
+(function () {
+  'use strict';
+
+  const versionFrontend = '2.0.0';
+  window.__AP_VERSION__ = versionFrontend;
+
+  /* ---------- Utilidades públicas ---------- */
+  const Utils = {
+    qs(sel, root = document) { return root.querySelector(sel); },
+    qsa(sel, root = document) { return Array.from(root.querySelectorAll(sel)); },
+    show(el) { if (el) el.hidden = false; },
+    hide(el) { if (el) el.hidden = true; },
+    escapeHtml(str) {
+      return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    },
+    debounce(fn, ms = 200) {
+      let t;
+      return function (...args) {
+        clearTimeout(t);
+        t = setTimeout(() => fn.apply(this, args), ms);
+      };
+    },
+    toast(mensaje, tipo = 'info', ms = 3800) {
+      const host = document.getElementById('toastHost');
+      if (!host) return;
+      const el = document.createElement('div');
+      el.className = 'toast toast-' + tipo;
+      el.setAttribute('role', tipo === 'error' ? 'alert' : 'status');
+      el.textContent = mensaje;
+      host.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('visible'));
+      setTimeout(() => {
+        el.classList.remove('visible');
+        setTimeout(() => el.remove(), 300);
+      }, ms);
+    },
+    async fetchJSON(url, opciones = {}) {
+      const headers = Object.assign(
+        { 'Accept': 'application/json' },
+        opciones.body ? { 'Content-Type': 'application/json' } : {},
+        opciones.headers || {}
+      );
+      const respuesta = await fetch(url, Object.assign({}, opciones, { headers }));
+      const tipo = respuesta.headers.get('content-type') || '';
+      const cuerpo = tipo.includes('application/json')
+        ? await respuesta.json().catch(() => ({}))
+        : await respuesta.text();
+      if (!respuesta.ok) {
+        const mensaje = (cuerpo && cuerpo.error) || `Error HTTP ${respuesta.status}`;
+        const err = new Error(mensaje);
+        err.status = respuesta.status;
+        err.body = cuerpo;
+        throw err;
+      }
+      return cuerpo;
+    }
+  };
+  window.Utils = Utils;
+
+  /* ---------- Actualiza chip de estado ---------- */
+  async function comprobarServicio() {
+    const chip = document.getElementById('estadoIA');
+    if (!chip) return;
+    try {
+      const data = await Utils.fetchJSON('/api/salud');
+      if (data && data.estado === 'ok') {
+        chip.textContent = data.modo_ia
+          ? `IA lista · ${data.modelo_ia || 'modelo'}`
+          : 'Modo local (sin IA)';
+        chip.dataset.modo = data.modo_ia ? 'ia' : 'local';
+      } else {
+        chip.textContent = 'Servicio sin respuesta';
+        chip.dataset.modo = 'error';
+      }
+    } catch (e) {
+      chip.textContent = 'Servicio no disponible';
+      chip.dataset.modo = 'error';
+    }
+  }
+
+  /* ---------- Diagnóstico del avatar ---------- */
+  function actualizarDiagnostico(msg) {
+    const el = document.getElementById('avatarDiagnostico');
+    if (el) el.textContent = msg;
+  }
+
+  /* ---------- Captura global de errores ---------- */
+  window.addEventListener('error', function (e) {
+    const estado = document.getElementById('avatarEstado');
+    if (estado && !window.avatar3dIniciado) {
+      estado.textContent = 'Error cargando dependencias 3D';
+    }
+    actualizarDiagnostico('Error JavaScript: ' + (e.message || 'Revisa la consola (F12).'));
+  });
+
+  window.addEventListener('unhandledrejection', function (e) {
+    const razon = e.reason && (e.reason.message || e.reason.toString());
+    console.warn('Promesa rechazada sin manejar:', razon);
+    actualizarDiagnostico('Promesa rechazada: ' + razon);
+  });
+
+  /* ---------- Modal de ayuda ---------- */
+  function abrirAyuda() {
+    const m = document.getElementById('modalAyuda');
+    if (!m) return;
+    m.hidden = false;
+    const btn = document.getElementById('cerrarAyuda');
+    if (btn) btn.focus();
+  }
+  function cerrarAyuda() {
+    const m = document.getElementById('modalAyuda');
+    if (m) m.hidden = true;
+  }
+
+  /* ---------- Inicialización ---------- */
+  document.addEventListener('DOMContentLoaded', function () {
+    comprobarServicio();
+    setInterval(comprobarServicio, 60000);
+
+    const version = document.getElementById('versionFrontend');
+    if (version) version.textContent = 'Frontend V' + versionFrontend + ' listo.';
+
+    const btnAyuda = document.getElementById('btnAyuda');
+    if (btnAyuda) btnAyuda.addEventListener('click', abrirAyuda);
+
+    const btnCerrar = document.getElementById('cerrarAyuda');
+    if (btnCerrar) btnCerrar.addEventListener('click', cerrarAyuda);
+
+    const modal = document.getElementById('modalAyuda');
+    if (modal) {
+      modal.addEventListener('click', (ev) => {
+        if (ev.target === modal) cerrarAyuda();
+      });
+    }
+
+    /* Atajos de teclado */
+    document.addEventListener('keydown', function (ev) {
+      const tag = (ev.target && ev.target.tagName) || '';
+      const escribiendo = tag === 'INPUT' || tag === 'TEXTAREA' || (ev.target && ev.target.isContentEditable);
+
+      if (ev.key === 'Escape') {
+        cerrarAyuda();
+        return;
+      }
+      if (escribiendo) {
+        if (ev.ctrlKey && ev.key === 'Enter') {
+          const form = document.getElementById('form');
+          if (form) form.requestSubmit();
+        }
+        return;
+      }
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+
+      const k = ev.key.toLowerCase();
+      if (k === 'g') {
+        const tema = document.querySelector('input[name="tema"]');
+        if (tema) { tema.focus(); tema.select(); ev.preventDefault(); }
+      } else if (k === 'v') {
+        const b = document.getElementById('voice');
+        if (b) { b.click(); ev.preventDefault(); }
+      } else if (k === 'l') {
+        const b = document.getElementById('speak');
+        if (b) { b.click(); ev.preventDefault(); }
+      } else if (k === 'p') {
+        const b = document.getElementById('imprimir');
+        if (b) { b.click(); ev.preventDefault(); }
+      } else if (ev.key === '?') {
+        abrirAyuda();
+      }
+    });
+
+    /* Botón limpiar formulario */
+    const btnLimpiar = document.getElementById('btnLimpiar');
+    if (btnLimpiar) {
+      btnLimpiar.addEventListener('click', function () {
+        const form = document.getElementById('form');
+        if (!form) return;
+        form.reset();
+        Utils.toast('Formulario restablecido.', 'info', 2000);
+      });
+    }
+  });
+})();
+</script>
+
+<!-- ======================== MÓDULOS DE LA APP ======================== -->
+<script type="module" src="/static/avatar3d.js?v=2.0.0"></script>
+<script defer src="/static/app.js?v=2.0.0"></script>
+</body>
+</html>
